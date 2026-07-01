@@ -1,89 +1,112 @@
 const PROMPT_API = "/api/prompts";
+const CHAT_API = "/api/chats";
 const REVIEW_API = "/api/reviews";
+const DOCUMENT_API = "/api/documents";
 
-export async function getPrompts() {
-  const response = await fetch(`${PROMPT_API}/`);
-  return response.json();
+async function request(url, options = {}) {
+  const response = await fetch(url, options);
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json")
+    ? await response.json()
+    : await response.text();
+
+  if (!response.ok) {
+    const detail = data?.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : detail?.message || `Request failed (${response.status})`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  return data;
 }
 
-
-export async function getPromptById(id) {
-  const response = await fetch(
-    `${PROMPT_API}/${id}`
-  );
-
-  return response.json();
-}
-
-export async function checkPromptExists(id) {
-  const response = await fetch(
-    `${PROMPT_API}/${id}/exists`
-  );
-
-  return response.json();
-}
-
-export async function createPrompt(data) {
-  const response = await fetch(`${PROMPT_API}/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+function jsonOptions(method, data) {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
-  });
-
-  return response.json();
+  };
 }
 
-export async function updatePrompt(id, data) {
-  const response = await fetch(`${PROMPT_API}/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(data)
-  });
-
-  return response.json();
+export function getPrompts() {
+  return request(`${PROMPT_API}/`);
 }
 
-export async function deletePrompt(id) {
-  const response = await fetch(`${PROMPT_API}/${id}`, {
-    method: "DELETE"
-  });
-
-  return response.json();
+export function createPrompt(data) {
+  return request(`${PROMPT_API}/`, jsonOptions("POST", data));
 }
 
-export async function getReviews() {
-  const response = await fetch(`${REVIEW_API}/`);
-  return response.json();
+export function updatePrompt(id, data) {
+  return request(`${PROMPT_API}/${id}`, jsonOptions("PUT", data));
 }
 
-export async function createReview(data) {
-  const response = await fetch(`${REVIEW_API}/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(data)
-  });
-
-  return response.json();
+export function deletePrompt(id) {
+  return request(`${PROMPT_API}/${id}`, { method: "DELETE" });
 }
 
-export async function getReviewSummary(promptId) {
-  const response = await fetch(
-    `${REVIEW_API}/${promptId}/summary`
+export function executePrompt(id) {
+  return request(
+    `${PROMPT_API}/${id}/execute`,
+    jsonOptions("POST", {})
   );
-
-  return response.json();
 }
 
-export async function getReviewById(id) {
-  const response = await fetch(
-    `${REVIEW_API}/${id}`
+export function createDocumentChat(documentId, content) {
+  return request(
+    "/api/document-chats",
+    jsonOptions("POST", {
+      content,
+      ...(documentId ? { document_id: documentId } : {})
+    })
   );
+}
+export function getChats(promptId = null) {
+  const query = promptId
+    ? `?prompt_id=${encodeURIComponent(promptId)}`
+    : "";
+  return request(`${CHAT_API}${query}`);
+}
 
-  return response.json();
+export function getChat(id) {
+  return request(`${CHAT_API}/${id}`);
+}
+
+export function sendChatMessage(id, content, documentId = null) {
+  return request(
+    `${CHAT_API}/${id}/messages`,
+    jsonOptions("POST", {
+      content,
+      ...(documentId ? { document_id: documentId } : {})
+    })
+  );
+}
+
+export function summarizeChat(id) {
+  return request(`${CHAT_API}/${id}/summary`, { method: "POST" });
+}
+
+export function deleteChat(id) {
+  return request(`${CHAT_API}/${id}`, { method: "DELETE" });
+}
+
+export function uploadDocument(file) {
+  const data = new FormData();
+  data.append("file", file);
+  return request(DOCUMENT_API, { method: "POST", body: data });
+}
+
+export function getReviews(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.promptId) params.set("prompt_id", filters.promptId);
+  if (filters.chatId) params.set("chat_id", filters.chatId);
+  const query = params.toString() ? `?${params}` : "";
+  return request(`${REVIEW_API}/${query}`);
+}
+
+export function createReview(data) {
+  return request(`${REVIEW_API}/`, jsonOptions("POST", data));
 }

@@ -1,133 +1,166 @@
-# Prompt Manager System
+# Prompt Manager System — Week 2
 
-Week 1 project using:
+The Week 1 FastAPI/PostgreSQL project now supports live LLM execution,
+multi-turn chats, token accounting, summaries, and reviews of complete
+conversations
 
-- FastAPI
-- MVC architecture
-- PostgreSQL persistence
-- Two services: `prompt_service` and `review_service`
-- `httpx` service-to-service communication
-- Vite + React frontend
-- `nginx.conf` reverse proxy config
+PostgreSQL has intentionally been retained. The existing `DATABASE_URL`,
+`prompts` table, `reviews` table, and stored rows are preserved. Startup adds
+the Week 2 `chats` and `messages` tables and two backward-compatible columns
+to `reviews` (`target_type` and `chat_id`).
 
-## Project Structure
+## Architecture
 
-```text
-prompt-manager-full/
-├── .env
-├── requirements.txt
-├── nginx.conf
-├── prompt_service/
-├── review_service/
-└── frontend/
+```mermaid
+flowchart LR
+    UI[React frontend]
+    PS[prompt-service :8000]
+    LS[llm-service :8002]
+    OR[OpenRouter API]
+    RS[review-service :8001]
+    DB[(Existing PostgreSQL)]
+
+    UI -->|prompts, chats| PS
+    PS -->|async generate / summarize| LS
+    LS -->|async chat completions| OR
+    UI -->|reviews| RS
+    RS -->|async prompt/chat snapshot| PS
+    PS -->|owns prompts, chats, messages| DB
+    RS -->|owns reviews| DB
 ```
 
-## 1. Create PostgreSQL Database
+There is no API gateway between services. The Vite/Nginx routes are frontend
+reverse proxies only. Review-service obtains prompt and chat data over HTTP;
+it never queries prompt-service tables directly.
 
-Open PostgreSQL shell and run:
+## What Week 2 adds
 
-```sql
-CREATE DATABASE prompt_manager;
+- A stateless `llm-service` with shared `httpx.AsyncClient` access to
+  OpenRouter.
+- Async prompt execution, follow-up messages, and conversation summaries.
+- Per-assistant-message token usage plus a running chat total.
+- Full chat snapshots for reviews while keeping prompt reviews compatible.
+- Explicit 502/503/504 handling for upstream, connection, and timeout errors.
+- `asyncio.to_thread` around database work inside async request flows.
+- A React conversation UI with loading states, token counts, summaries, and
+  prompt/chat review selection.
+
+## Setup
+
+1. Create the existing PostgreSQL database if it does not already exist:
+
+   ```sql
+   CREATE DATABASE prompt_manager;
+   ```
+
+2. Copy `.env.example` to `.env` and fill in your existing PostgreSQL
+   connection, OpenRouter key, and chosen OpenRouter model:
+
+   ```env
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/prompt_manager
+   OPENROUTER_API_KEY=replace_with_your_key
+   OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+   DEFAULT_MODEL=your-provider/your-model
+   PROMPT_SERVICE_URL=http://localhost:8000
+   REVIEW_SERVICE_URL=http://localhost:8001
+   LLM_SERVICE_URL=http://localhost:8002
+   ```
+
+3. Install dependencies:
+
+   ```powershell
+   .\venv\Scripts\python.exe -m pip install -r requirements.txt
+   cd frontend
+   npm install
+   ```
+
+## Run all services
+
+Open four terminals at the project root:
+
+```powershell
+.\venv\Scripts\python.exe -m uvicorn prompt_service.main:app --reload --port 8000
 ```
 
-If your PostgreSQL password is different, update `.env`:
-
-```env
-DATABASE_URL=postgresql://postgres:your_password@localhost:5432/prompt_manager
+```powershell
+.\venv\Scripts\python.exe -m uvicorn review_service.main:app --reload --port 8001
 ```
 
-## 2. Install Python Dependencies
-
-```bash
-pip install -r requirements.txt
+```powershell
+.\venv\Scripts\python.exe -m uvicorn llm_service.main:app --reload --port 8002
 ```
 
-## 3. Run Prompt Service
-
-From the project root:
-
-```bash
-uvicorn prompt_service.main:app --reload --port 8000
-```
-
-Swagger:
-
-```text
-http://localhost:8000/docs
-```
-
-## 4. Run Review Service
-
-Open another terminal from the project root:
-
-```bash
-uvicorn review_service.main:app --reload --port 8001
-```
-
-Swagger:
-
-```text
-http://localhost:8001/docs
-```
-
-## 5. Run Frontend
-
-```bash
+```powershell
 cd frontend
-npm install
 npm run dev
 ```
 
-Frontend:
+Open `http://localhost:5173`. Interactive API documentation is available at
+ports 8000, 8001, and 8002 under `/docs`.
 
-```text
-http://localhost:5173
-```
+## Week 2 endpoints
 
-## 6. Nginx Usage
+### prompt-service
 
-Build frontend:
+- `POST /prompts/{id}/execute`
+- `GET /chats?prompt_id=`
+- `GET /chats/{chat_id}`
+- `POST /chats/{chat_id}/messages`
+- `POST /chats/{chat_id}/summary`
+- `DELETE /chats/{chat_id}`
 
-```bash
-cd frontend
-npm run build
-```
+All Week 1 prompt CRUD endpoints remain available.
 
-Copy `frontend/dist` contents into Nginx html folder and use the provided `nginx.conf`.
+### llm-service
 
-## API Endpoints
+- `POST /generate`
+- `POST /summarize`
+- `GET /models`
+- `GET /health`
 
-### Prompt Service
+### review-service
 
-- `POST /prompts/`
-- `GET /prompts/`
-- `GET /prompts/{prompt_id}`
-- `PUT /prompts/{prompt_id}`
-- `DELETE /prompts/{prompt_id}`
-- `GET /prompts/{prompt_id}/exists`
-
-### Review Service
-
-- `POST /reviews/`
-- `GET /reviews/`
+- `POST /reviews/` with `target_type: "prompt" | "chat"`
+- `GET /reviews/?prompt_id=&chat_id=`
 - `GET /reviews/{review_id}`
 - `GET /reviews/{prompt_id}/summary`
+- `GET /reviews/chat/{chat_id}/summary`
 
-## Suggested Granular Git Commits
+The original prompt-review request remains valid:
 
-```bash
-git add .
-git commit -m "setup project structure"
-
-git add prompt_service
-git commit -m "add prompt service mvc crud with postgres"
-
-git add review_service
-git commit -m "add review service with httpx integration"
-
-git add frontend
-git commit -m "add vite react frontend"
-
-git add nginx.conf README.md
-git commit -m "add nginx config and setup guide"
+```json
+{
+  "prompt_id": "PROMPT_UUID",
+  "reviewer_name": "Reviewer",
+  "score": 5,
+  "feedback": "Clear and useful."
+}
 ```
+
+A chat review uses:
+
+```json
+{
+  "target_type": "chat",
+  "chat_id": "CHAT_UUID",
+  "reviewer_name": "Reviewer",
+  "score": 5,
+  "feedback": "The full exchange stayed on task."
+}
+```
+
+## Live integration test
+
+With all three services running and a valid OpenRouter key configured:
+
+```powershell
+.\venv\Scripts\python.exe tests\integration_test.py
+```
+
+The test performs `create → execute → follow-up → summarize → review` and
+cleans up its temporary records.
+
+## Secret handling
+
+`.env` is ignored and `.env.example` contains placeholders only. Never commit
+an OpenRouter key or database password.
