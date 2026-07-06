@@ -46,7 +46,7 @@ async def main():
                 json={
                     "name": f"Week 2 integration {marker}",
                     "description": "Temporary end-to-end test prompt",
-                    "content": "Reply with exactly two friendly words.",
+                    "content": "You are a friendly assistant. Reply concisely.",
                     "tags": "integration-test",
                 },
             )
@@ -56,7 +56,9 @@ async def main():
                 f"{PROMPT_URL}/prompts/{prompt['id']}/execute",
                 json={},
             )
-            assert len(chat["messages"]) == 2
+            assert len(chat["messages"]) == 1
+            assert chat["messages"][0]["llm_role"] == "system"
+            assert chat["total_tokens"] == 0
 
             chat = await checked(
                 client,
@@ -64,7 +66,7 @@ async def main():
                 f"{PROMPT_URL}/chats/{chat['id']}/messages",
                 json={"content": "Now reply with one friendly word."},
             )
-            assert len(chat["messages"]) == 4
+            assert len(chat["messages"]) == 3
 
             summary = await checked(
                 client,
@@ -86,7 +88,7 @@ async def main():
                 },
             )
             assert review["snapshot"]["id"] == chat["id"]
-            print("PASS: create → execute → chat → summarize → review")
+            print("PASS: create -> load system prompt -> chat -> summarize -> review")
         finally:
             if review:
                 await client.delete(f"{REVIEW_URL}/reviews/{review['id']}")

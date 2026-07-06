@@ -19,7 +19,10 @@ DOCUMENT_CONTEXT_INSTRUCTIONS = (
 
 def _chat_messages_for_llm(chat, document=None):
     messages = [
-        {"role": message["role"], "content": message["content"]}
+        {
+            "role": message.get("llm_role", message["role"]),
+            "content": message["content"],
+        }
         for message in chat["messages"]
     ]
     if document:
@@ -168,34 +171,18 @@ async def create_document_chat_controller(data, llm_client, document_client):
         }
     return result
 
-async def execute_prompt_controller(prompt_id, data, client):
+async def execute_prompt_controller(prompt_id, data):
     row = await asyncio.to_thread(prompt_model.get_prompt_by_id, prompt_id)
     if not row:
         raise HTTPException(status_code=404, detail="Prompt not found")
 
     prompt = row_to_prompt(row)
-    chat = await asyncio.to_thread(chat_model.create_chat, prompt, None)
-
-    payload = {"messages": _chat_messages_for_llm(chat)}
-
-    try:
-        generated = await _call_llm(client, "/generate", payload)
-    except HTTPException as exc:
-        exc.detail = {"message": exc.detail, "chat_id": str(chat["id"])}
-        raise
-
-    usage = generated.get("usage") or {}
-    await asyncio.to_thread(
-        chat_model.append_message,
-        chat["id"],
-        "assistant",
-        generated.get("content", ""),
-        int(usage.get("prompt_tokens") or 0),
-        int(usage.get("completion_tokens") or 0),
-        int(usage.get("total_tokens") or 0),
+    return await asyncio.to_thread(
+        chat_model.create_chat,
+        prompt,
+        None,
+        initial_llm_role="system",
     )
-    return await asyncio.to_thread(chat_model.get_chat_by_id, chat["id"])
-
 
 async def add_chat_message_controller(
     chat_id, data, llm_client, document_client

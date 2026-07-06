@@ -10,6 +10,7 @@ from prompt_service.database import get_connection
 
 ATTACHMENT_PREFIX = "[[prompt-manager-attachment:"
 ATTACHMENT_SUFFIX = "]]\n"
+SYSTEM_PROMPT_PREFIX = "[[prompt-manager-system-prompt]]\n"
 ATTACHMENT_FIELDS = (
     "id",
     "filename",
@@ -57,6 +58,18 @@ def decode_message_content(content):
     return visible_content, [metadata] if isinstance(metadata, dict) else []
 
 
+def encode_llm_role(content, llm_role=None):
+    if llm_role == "system":
+        return f"{SYSTEM_PROMPT_PREFIX}{content}"
+    return content
+
+
+def decode_llm_role(content, stored_role):
+    if content and content.startswith(SYSTEM_PROMPT_PREFIX):
+        return content[len(SYSTEM_PROMPT_PREFIX):], "system"
+    return content, stored_role
+
+
 def _fetch_chat(cur, chat_id):
     cur.execute(
         """
@@ -83,14 +96,22 @@ def _fetch_chat(cur, chat_id):
     )
     messages = cur.fetchall()
     for message in messages:
+        stored_content, message["llm_role"] = decode_llm_role(
+            message["content"], message["role"]
+        )
         message["content"], message["attachments"] = decode_message_content(
-            message["content"]
+            stored_content
         )
     chat["messages"] = messages
     return chat
 
 
-def create_chat(prompt, model=None, attachment=None):
+def create_chat(
+    prompt,
+    model=None,
+    attachment=None,
+    initial_llm_role=None,
+):
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -125,7 +146,10 @@ def create_chat(prompt, model=None, attachment=None):
                 (
                     str(uuid4()),
                     chat_id,
-                    encode_message_content(prompt["content"], attachment),
+                    encode_llm_role(
+                        encode_message_content(prompt["content"], attachment),
+                        initial_llm_role,
+                    ),
                     now,
                 ),
             )

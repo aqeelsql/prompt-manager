@@ -1,0 +1,125 @@
+services:
+  prompt-service:
+    build:
+      context: .
+      dockerfile: prompt_service/Dockerfile
+    container_name: prompt-service
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - prompt-network
+
+  review-service:
+    build:
+      context: .
+      dockerfile: review_service/Dockerfile
+    container_name: review-service
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - prompt-network
+
+  llm-service:
+    build:
+      context: .
+      dockerfile: llm_service/Dockerfile
+    container_name: llm-service
+    env_file:
+      - .env
+    ports:
+      - "8002:8002"
+    networks:
+      - prompt-network
+
+  file-service:
+    build:
+      context: .
+      dockerfile: file_service/Dockerfile
+    container_name: file-service
+    env_file:
+      - .env
+    ports:
+      - "8003:8003"
+    volumes:
+      - file_uploads:/app/file_service/uploads
+    networks:
+      - prompt-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: frontend
+    networks:
+      - prompt-network
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: prompt_manager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d prompt_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - prompt-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-gateway
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - prompt-service
+      - review-service
+      - llm-service
+      - file-service
+    networks:
+      - prompt-network
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+
+    restart: unless-stopped
+    command:
+      - http
+      - http://nginx:80 
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - nginx
+    networks:
+      - prompt-network
+
+networks:
+  prompt-network:
+    driver: bridge
+
+volumes:
+  file_uploads:
+  postgres_data:

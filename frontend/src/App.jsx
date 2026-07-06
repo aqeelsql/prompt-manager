@@ -13,6 +13,7 @@ import {
   executePrompt,
   getChat,
   getChats,
+  getDocumentFileUrl,
   getPrompts,
   getReviews,
   sendChatMessage,
@@ -61,6 +62,12 @@ function FormattedContent({ content }) {
   );
 }
 
+function messageAuthor(message, userLabel = "You") {
+  if (message.role === "assistant") return "Assistant";
+  if (message.llm_role === "system") return "System prompt";
+  return userLabel;
+}
+
 function MessageAttachments({ attachments = [] }) {
   if (!attachments.length) return null;
 
@@ -70,8 +77,20 @@ function MessageAttachments({ attachments = [] }) {
         const fileType = (
           attachment.file_type || attachment.filename?.split(".").pop() || "file"
         ).toUpperCase();
+        const FileCard = attachment.id ? "a" : "div";
         return (
-          <div className="message-file-card" key={attachment.id || `${attachment.filename}-${index}`}>
+          <FileCard
+            className="message-file-card"
+            href={attachment.id ? getDocumentFileUrl(attachment.id) : undefined}
+            key={attachment.id || `${attachment.filename}-${index}`}
+            rel={attachment.id ? "noreferrer" : undefined}
+            target={attachment.id ? "_blank" : undefined}
+            title={
+              attachment.id
+                ? `${fileType === "PDF" ? "Open" : "Download"} ${attachment.filename}`
+                : undefined
+            }
+          >
             <span className="message-file-icon">{fileType === "PDF" ? "PDF" : "DOC"}</span>
             <span className="message-file-copy">
               <strong>{attachment.filename || "Attached document"}</strong>
@@ -82,13 +101,17 @@ function MessageAttachments({ attachments = [] }) {
                   : ""}
               </small>
             </span>
-          </div>
+            {attachment.id && (
+              <span className="message-file-action">
+                {fileType === "PDF" ? "Open" : "Download"}
+              </span>
+            )}
+          </FileCard>
         );
       })}
     </div>
   );
 }
-
 function ReviewSnapshot({ review }) {
   const snapshot = review.snapshot ?? review.prompt_snapshot ?? "";
 
@@ -110,7 +133,7 @@ function ReviewSnapshot({ review }) {
             <div className="review-conversation">
               {messages.map((message, index) => (
                 <div className="review-snapshot-message" key={message.id || index}>
-                  <strong>{message.role === "assistant" ? "Assistant" : "User"}</strong>
+                  <strong>{messageAuthor(message, "User")}</strong>
                   <FormattedContent content={message.content} />
                 </div>
               ))}
@@ -192,7 +215,9 @@ function App() {
     const saved = await runAction(
       "prompt",
       () => (editingId ? updatePrompt(editingId, promptForm) : createPrompt(promptForm)),
-      editingId ? "Prompt updated." : "Prompt created."
+      editingId
+        ? "Prompt updated."
+        : "Prompt created. Click Use prompt to start a conversation."
     );
     if (!saved) return;
     setPromptForm(EMPTY_PROMPT);
@@ -205,7 +230,7 @@ function App() {
     const chat = await runAction(
       `execute-${prompt.id}`,
       () => executePrompt(prompt.id),
-      "Prompt executed. The conversation is ready."
+      "System prompt loaded. Send a message to start the conversation."
     );
     if (!chat) return;
     setActiveChat(chat);
@@ -497,7 +522,7 @@ function App() {
                       disabled={busy === `execute-${prompt.id}`}
                       onClick={() => handleExecute(prompt)}
                     >
-                      {busy === `execute-${prompt.id}` ? "Running…" : "Execute"}
+                      {busy === `execute-${prompt.id}` ? "Loading…" : "Use prompt"}
                     </button>
                     <button
                       className="button ghost"
@@ -551,7 +576,7 @@ function App() {
                   <small>{chat.total_tokens} tokens</small>
                 </button>
               ))}
-              {!chats.length && <p className="empty">Executed prompts will appear here.</p>}
+              {!chats.length && <p className="empty">Prompt conversations will appear here.</p>}
             </div>
 
             {activeChat ? (
@@ -560,7 +585,7 @@ function App() {
                   {activeChat.messages?.map((message) => (
                     <article className={`message ${message.role}`} key={message.id}>
                       <div className="message-meta">
-                        <strong>{message.role === "assistant" ? "Assistant" : "You"}</strong>
+                        <strong>{messageAuthor(message)}</strong>
                         <span>{formatDate(message.created_at)}</span>
                       </div>
                       <MessageAttachments attachments={message.attachments} />
@@ -846,7 +871,7 @@ function App() {
                 activeChat.messages.map((message) => (
                   <article className={`message ${message.role}`} key={message.id}>
                     <div className="message-meta">
-                      <strong>{message.role === "assistant" ? "Assistant" : "You"}</strong>
+                      <strong>{messageAuthor(message)}</strong>
                       <span>{formatDate(message.created_at)}</span>
                     </div>
                     <MessageAttachments attachments={message.attachments} />

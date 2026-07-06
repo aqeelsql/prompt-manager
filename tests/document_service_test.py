@@ -61,6 +61,13 @@ class DocumentServiceTest(TestCase):
             fetched.json()["extracted_text"], uploaded["extracted_text"]
         )
 
+        source = self.client.get(f"/documents/{uploaded['id']}/file")
+        self.assertEqual(source.status_code, 200)
+        self.assertTrue(source.content.startswith(b"PK"))
+        self.assertIn(
+            "attachment", source.headers.get("content-disposition", "")
+        )
+
     def test_rejects_non_document_upload(self):
         response = self.client.post(
             "/documents",

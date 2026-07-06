@@ -1,10 +1,25 @@
+import time
 import psycopg2
-
+from psycopg2 import OperationalError
 from review_service.config import DATABASE_URL
 
 
 def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+    retries = 15
+
+    while retries > 0:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            print("✅ Connected to PostgreSQL")
+            return conn
+
+        except OperationalError as e:
+            retries -= 1
+            print(f"⏳ Waiting for PostgreSQL... {15 - retries}/15")
+            print(e)
+            time.sleep(2)
+
+    raise Exception("Could not connect to PostgreSQL.")
 
 
 def init_db():

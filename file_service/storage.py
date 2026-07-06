@@ -141,6 +141,23 @@ def get_document(document_id):
     }
 
 
+def get_document_source(document_id):
+    document_dir = _document_dir(document_id)
+    metadata_path = document_dir / "metadata.json"
+    if not metadata_path.is_file():
+        raise FileNotFoundError("Document not found")
+
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    file_type = metadata.get("file_type")
+    if file_type not in {"pdf", "docx"}:
+        raise FileNotFoundError("Document not found")
+
+    source_path = document_dir / f"source.{file_type}"
+    if not source_path.is_file():
+        raise FileNotFoundError("Document not found")
+    return source_path, metadata
+
+
 def list_documents():
     initialize_storage()
     documents = []

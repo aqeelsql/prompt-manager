@@ -2,6 +2,7 @@ import asyncio
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from file_service.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
 from file_service.schemas import DocumentResponse, DocumentSummary
@@ -9,6 +10,7 @@ from file_service.storage import (
     DocumentStorageError,
     delete_document,
     get_document,
+    get_document_source,
     initialize_storage,
     list_documents,
     save_document,
@@ -99,6 +101,25 @@ async def document_text(document_id: str):
         "extracted_text": stored["extracted_text"],
         "character_count": stored["character_count"],
     }
+
+
+@app.get("/documents/{document_id}/file")
+async def document_file(document_id: str):
+    try:
+        source_path, metadata = await asyncio.to_thread(
+            get_document_source, document_id
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="Document not found") from exc
+
+    return FileResponse(
+        path=source_path,
+        media_type=metadata["content_type"],
+        filename=metadata["filename"],
+        content_disposition_type=(
+            "inline" if metadata["file_type"] == "pdf" else "attachment"
+        ),
+    )
 
 
 @app.delete("/documents/{document_id}")

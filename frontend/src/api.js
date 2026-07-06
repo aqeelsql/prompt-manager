@@ -99,6 +99,10 @@ export function uploadDocument(file) {
   return request(DOCUMENT_API, { method: "POST", body: data });
 }
 
+export function getDocumentFileUrl(id) {
+  return `${DOCUMENT_API}/${encodeURIComponent(id)}/file`;
+}
+
 export function getReviews(filters = {}) {
   const params = new URLSearchParams();
   if (filters.promptId) params.set("prompt_id", filters.promptId);

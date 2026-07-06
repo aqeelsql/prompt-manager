@@ -3,7 +3,9 @@
 from unittest import TestCase
 
 from prompt_service.models.chat_model import (
+    decode_llm_role,
     decode_message_content,
+    encode_llm_role,
     encode_message_content,
 )
 
@@ -30,3 +32,13 @@ class MessageAttachmentTest(TestCase):
 
         self.assertEqual(content, "Hello")
         self.assertEqual(attachments, [])
+
+    def test_system_prompt_role_round_trip(self):
+        stored = encode_llm_role(
+            "Always answer with concise Python.", "system"
+        )
+
+        content, llm_role = decode_llm_role(stored, "user")
+
+        self.assertEqual(content, "Always answer with concise Python.")
+        self.assertEqual(llm_role, "system")

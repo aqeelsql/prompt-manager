@@ -1084,6 +1084,17 @@ select:focus {
   border-radius: 11px;
   background: #f8fafc;
   color: #1d2939;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+a.message-file-card:hover {
+  border-color: #84adff;
+  box-shadow: 0 5px 14px rgba(23, 92, 211, 0.12);
+  transform: translateY(-1px);
 }
 
 .message-file-icon {
@@ -1116,6 +1127,13 @@ select:focus {
 .message-file-copy small {
   color: #667085;
   font-size: 0.61rem;
+}
+
+.message-file-action {
+  margin-left: auto;
+  color: #175cd3;
+  font-size: 0.62rem;
+  font-weight: 750;
 }
 
 .message.user .message-file-card {

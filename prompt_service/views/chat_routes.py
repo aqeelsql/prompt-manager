@@ -21,12 +21,8 @@ async def create_document_chat(data: DocumentChatCreate, request: Request):
     )
 
 @router.post("/prompts/{prompt_id}/execute")
-async def execute_prompt(
-    prompt_id: UUID, data: PromptExecuteRequest, request: Request
-):
-    return await chat_controller.execute_prompt_controller(
-        prompt_id, data, request.app.state.llm_client
-    )
+async def execute_prompt(prompt_id: UUID, data: PromptExecuteRequest):
+    return await chat_controller.execute_prompt_controller(prompt_id, data)
 
 
 @router.get("/chats")

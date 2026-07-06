@@ -1,0 +1,125 @@
+name: Build and Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  VERSION: v${{ github.run_number }}
+
+jobs:
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: docker compose config
+
+      - name: Validate Python Syntax
+        run: |
+          python -m compileall prompt_service
+          python -m compileall review_service
+          python -m compileall llm_service
+          python -m compileall file_service
+
+      - name: Build Prompt Service
+        run: |
+          docker build \
+          -f prompt_service/Dockerfile \
+          -t prompt-test .
+
+      - name: Build Review Service
+        run: |
+          docker build \
+          -f review_service/Dockerfile \
+          -t review-test .
+
+      - name: Build LLM Service
+        run: |
+          docker build \
+          -f llm_service/Dockerfile \
+          -t llm-test .
+
+      - name: Build File Service
+        run: |
+          docker build \
+          -f file_service/Dockerfile \
+          -t file-test .
+
+      - name: Build Frontend
+        run: |
+          docker build \
+          -f frontend/Dockerfile \
+          -t frontend-test .
+
+  publish:
+
+    needs: verify
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Push Prompt
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: prompt_service/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/prompt-service:${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/prompt-service:latest
+
+      - name: Push Review
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: review_service/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/review-service:${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/review-service:latest
+
+      - name: Push LLM
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: llm_service/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/llm-service:${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/llm-service:latest
+
+      - name: Push File
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: file_service/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/file-service:${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/file-service:latest
+
+      - name: Push Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/frontend:${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/frontend:latest
