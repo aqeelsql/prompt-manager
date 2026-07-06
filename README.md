@@ -57,6 +57,10 @@ The frontend uses relative `/api/...` URLs. During development, Vite proxies tho
 | File Service | 8003 | Upload, validation, extraction, storage, file serving |
 | React/Vite frontend | 5173 | Browser UI and development API gateway |
 
+
+
+
+
 FastAPI documentation is available at:
 
 - `http://localhost:8000/docs`
