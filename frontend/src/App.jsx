@@ -68,6 +68,10 @@ function messageAuthor(message, userLabel = "You") {
   return userLabel;
 }
 
+function visibleChatMessages(messages = []) {
+  return messages.filter((message) => message.llm_role !== "system");
+}
+
 function MessageAttachments({ attachments = [] }) {
   if (!attachments.length) return null;
 
@@ -377,6 +381,7 @@ function App() {
   }
 
   const reviewTargets = reviewForm.target_type === "chat" ? chats : prompts;
+  const activeVisibleMessages = visibleChatMessages(activeChat?.messages);
 
   return (
     <div className={`app-shell ${activeView === "chat" ? "chat-mode" : ""}` }>
@@ -582,23 +587,35 @@ function App() {
             {activeChat ? (
               <>
                 <div className="messages">
-                  {activeChat.messages?.map((message) => (
-                    <article className={`message ${message.role}`} key={message.id}>
-                      <div className="message-meta">
-                        <strong>{messageAuthor(message)}</strong>
-                        <span>{formatDate(message.created_at)}</span>
-                      </div>
-                      <MessageAttachments attachments={message.attachments} />
-                      <FormattedContent content={message.content} />
-                      {message.role === "assistant" && (
-                        <div className="usage">
-                          <span>Prompt {message.prompt_tokens}</span>
-                          <span>Completion {message.completion_tokens}</span>
-                          <span>Total {message.total_tokens}</span>
+                  {activeVisibleMessages.length ? (
+                    activeVisibleMessages.map((message) => (
+                      <article className={`message ${message.role}`} key={message.id}>
+                        <div className="message-meta">
+                          <strong>{messageAuthor(message)}</strong>
+                          <span>{formatDate(message.created_at)}</span>
                         </div>
-                      )}
-                    </article>
-                  ))}
+                        <MessageAttachments attachments={message.attachments} />
+                        <FormattedContent content={message.content} />
+                        {message.role === "assistant" && (
+                          <div className="usage">
+                            <span>Prompt {message.prompt_tokens}</span>
+                            <span>Completion {message.completion_tokens}</span>
+                            <span>Total {message.total_tokens}</span>
+                          </div>
+                        )}
+                      </article>
+                    ))
+                  ) : (
+                    <div className="chat-empty-stage">
+                      <div className="chat-start-copy">
+                        <div className="empty-icon">AI</div>
+                        <div>
+                          <h3>Prompt is ready</h3>
+                          <p>Send your first message to start this agent conversation.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {busy === "follow-up" && (
                     <article className="message assistant typing">
                       <span />
@@ -866,9 +883,9 @@ function App() {
             </div>
 
 
-            <div className={`messages chat-messages ${activeChat?.messages?.length ? "has-history" : "empty-thread"}`}>
-              {activeChat?.messages?.length ? (
-                activeChat.messages.map((message) => (
+            <div className={`messages chat-messages ${activeVisibleMessages.length ? "has-history" : "empty-thread"}`}>
+              {activeVisibleMessages.length ? (
+                activeVisibleMessages.map((message) => (
                   <article className={`message ${message.role}`} key={message.id}>
                     <div className="message-meta">
                       <strong>{messageAuthor(message)}</strong>

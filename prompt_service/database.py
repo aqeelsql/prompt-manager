@@ -11,12 +11,12 @@ def get_connection():
     while retries > 0:
         try:
             conn = psycopg2.connect(DATABASE_URL)
-            print("✅ Connected to PostgreSQL")
+            print("Connected to PostgreSQL")
             return conn
 
         except OperationalError as e:
             retries -= 1
-            print(f"⏳ Waiting for PostgreSQL... {15 - retries}/15")
+            print(f"Waiting for PostgreSQL... {15 - retries}/15")
             print(e)
             time.sleep(2)
 

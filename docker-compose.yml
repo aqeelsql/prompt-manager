@@ -6,6 +6,12 @@ services:
     container_name: prompt-service
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:12345@postgres:5432/prompt_manager
+      PROMPT_SERVICE_URL: http://prompt-service:8000
+      REVIEW_SERVICE_URL: http://review-service:8001
+      LLM_SERVICE_URL: http://llm-service:8002
+      FILE_SERVICE_URL: http://file-service:8003
     ports:
       - "8000:8000"
     depends_on:
@@ -21,6 +27,12 @@ services:
     container_name: review-service
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:12345@postgres:5432/prompt_manager
+      PROMPT_SERVICE_URL: http://prompt-service:8000
+      REVIEW_SERVICE_URL: http://review-service:8001
+      LLM_SERVICE_URL: http://llm-service:8002
+      FILE_SERVICE_URL: http://file-service:8003
     ports:
       - "8001:8001"
     depends_on:
@@ -36,6 +48,12 @@ services:
     container_name: llm-service
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:12345@postgres:5432/prompt_manager
+      PROMPT_SERVICE_URL: http://prompt-service:8000
+      REVIEW_SERVICE_URL: http://review-service:8001
+      LLM_SERVICE_URL: http://llm-service:8002
+      FILE_SERVICE_URL: http://file-service:8003
     ports:
       - "8002:8002"
     networks:
@@ -48,6 +66,13 @@ services:
     container_name: file-service
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:12345@postgres:5432/prompt_manager
+      PROMPT_SERVICE_URL: http://prompt-service:8000
+      REVIEW_SERVICE_URL: http://review-service:8001
+      LLM_SERVICE_URL: http://llm-service:8002
+      FILE_SERVICE_URL: http://file-service:8003
+      FILE_STORAGE_DIR: /app/file_service/uploads
     ports:
       - "8003:8003"
     volumes:
@@ -102,11 +127,10 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     container_name: ngrok
-
     restart: unless-stopped
     command:
       - http
-      - http://nginx:80 
+      - http://nginx:80
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     ports:
